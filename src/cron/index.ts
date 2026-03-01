@@ -12,7 +12,7 @@ import {
   getTradeCount,
   insertSelfImprovementLog,
 } from "../db.ts";
-import { ZERO_PERSONALITY } from "../prompts/personalities.ts";
+import { MAX_PERSONALITY } from "../prompts/personalities.ts";
 import { buildPrompt } from "../prompts/self-improvement.ts";
 import type { ParsedResponse } from "./parser.ts";
 import { parseResponse } from "./parser.ts";
@@ -242,7 +242,7 @@ export async function runSelfImprovementCycle(): Promise<void> {
     const intervalMs = getEnvNumber("AGENT_INTERVAL_MS", 180000);
 
     const prompt = buildPrompt({
-      personality: ZERO_PERSONALITY,
+      personality: MAX_PERSONALITY,
       rankSignal,
       tradeAmount,
       cooldownHours,
