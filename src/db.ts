@@ -104,7 +104,7 @@ export async function getCurrentBalance(agentId: string, battleId: string): Prom
       .eq("battle_id", battleId)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     if (error) {
       console.error("[db] getCurrentBalance error:", error.message);
       return null;
@@ -127,7 +127,7 @@ export async function getPreviousBalance(agentId: string, battleId: string): Pro
       .lte("created_at", fourHoursAgo)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     if (error) {
       console.error("[db] getPreviousBalance error:", error.message);
       return null;
