@@ -257,6 +257,8 @@ export async function executeTrade(
     token_out: trade.tokenOut,
     amount_in: trade.amountIn,
     status: "pending",
+    agent_id: ctx.agentId,
+    battle_id: ctx.battleId,
   });
   try {
     const usdcBalance = await getUSDCBalance(ctx);
