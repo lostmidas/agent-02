@@ -93,7 +93,10 @@ async function init() {
 }
 
 async function cycle() {
-  const ctx: { threadId?: string } = {};
+  const ctx: { threadId?: string; agentId?: string; battleId?: string } = {
+    agentId: AGENT_ID,
+    battleId: BATTLE_ID,
+  };
   try {
     if (isDailyLimitHit()) {
       await log("trade", "Daily loss limit hit, pausing trading", {

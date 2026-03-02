@@ -17,6 +17,8 @@ let dailyLimitHit = false;
 
 interface CycleContext {
   threadId?: string;
+  agentId?: string;
+  battleId?: string;
 }
 
 class ApiTimeoutError extends Error {
@@ -345,7 +347,7 @@ export async function checkBalance(ctx: CycleContext) {
     }
   }
   updateDailyLossTracking(totalUsd);
-  await insertBalance(totalUsd, breakdown);
+  await insertBalance(totalUsd, breakdown, ctx.agentId, ctx.battleId);
   await log("balance_update", "Balance: $" + totalUsd.toFixed(2), {
     raw_data: { total_usd: totalUsd, breakdown },
     thread_id: ctx.threadId,
