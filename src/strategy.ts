@@ -76,11 +76,20 @@ async function promptAndPoll(
   return { response, jobId: submitted.jobId, threadId: submitted.threadId };
 }
 
-export async function scanTrends(ctx: CycleContext): Promise<string> {
+export async function scanTrends(
+  ctx: CycleContext,
+  tokensToWatch?: string[]
+): Promise<string> {
   await log("scanning", "Scanning trending tokens on Base...");
 
+  let prompt =
+    "What tokens are trending on Base right now? Analyze the top movers, their momentum, and any notable signals. Give me your top 3 picks with conviction levels (high/medium/low). Format each as: TOKEN_SYMBOL - direction (up/down) - conviction (high/medium/low) - brief reason.";
+  if (tokensToWatch && tokensToWatch.length > 0) {
+    prompt += ` Pay special attention to these tokens from your previous analysis: ${tokensToWatch.join(", ")}. Include them in your assessment if they show relevant signals.`;
+  }
+
   const result = await promptAndPoll(
-    "What tokens are trending on Base right now? Analyze the top movers, their momentum, and any notable signals. Give me your top 3 picks with conviction levels (high/medium/low). Format each as: TOKEN_SYMBOL - direction (up/down) - conviction (high/medium/low) - brief reason.",
+    prompt,
     ctx.threadId,
     "Scanning trending tokens on Base..."
   );

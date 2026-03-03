@@ -1,7 +1,6 @@
 import "./env.js";
 import { validateApiKey, getUserInfo } from "@bankr/cli";
-import { log } from "./db.js";
-import { startSelfImprovementCron } from "./cron/index.js";
+import { log, getLatestTokensToWatch } from "./db.js";
 import {
   scanTrends,
   decideAndTrade,
@@ -9,6 +8,7 @@ import {
   checkBalance,
   MAX_TRADE_PCT,
 } from "./strategy.js";
+import { startSelfImprovementCron } from "./cron/index.js";
 
 const INTERVAL_MS = parseInt(process.env.AGENT_INTERVAL_MS || "180000", 10);
 const AGENT_DRY_RUN = /^(1|true|yes)$/i.test(process.env.AGENT_DRY_RUN || "false");
@@ -97,7 +97,9 @@ async function cycle() {
       agent_id: AGENT_ID,
       battle_id: BATTLE_ID,
     });
-    const analysis = await scanTrends(ctx);
+    const tokensToWatch =
+      AGENT_ID && BATTLE_ID ? await getLatestTokensToWatch(AGENT_ID, BATTLE_ID) : [];
+    const analysis = await scanTrends(ctx, tokensToWatch);
     const { totalUsd, breakdown, amounts } = await checkBalance(ctx);
     const trades = decideAndTrade(ctx, analysis, totalUsd, breakdown, amounts);
     const sells = trades.filter((t) => t.tokenIn !== "USDC");
