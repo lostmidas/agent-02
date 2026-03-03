@@ -19,7 +19,7 @@ import { parseResponse } from "./parser.ts";
 import { callLLM } from "./llm.ts";
 import { writeBackAndRestart } from "./writer.ts";
 
-const CRON_EXPRESSION = "0 */4 * * *";
+const CRON_EXPRESSION = "0 */2 * * *";
 const AGENT_ID = process.env.AGENT_ID ?? "unknown";
 const LLM_RETRY_DELAY_MS = 30_000;
 const LLM_TIMEOUT_MS = 60_000;
