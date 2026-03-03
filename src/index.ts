@@ -3,15 +3,9 @@ import { validateApiKey, getUserInfo } from "@bankr/cli";
 import { log } from "./db.js";
 import {
   scanTrends,
-  getRSIForToken,
+  decideAndTrade,
   executeTrade,
   checkBalance,
-  isTokenInCooldown,
-  updateTokenCooldown,
-  hasReachedMaxPositions,
-  addOpenPosition,
-  removeOpenPosition,
-  isDailyLimitHit,
 } from "./strategy.js";
 
 const INTERVAL_MS = parseInt(process.env.AGENT_INTERVAL_MS || "180000", 10);
@@ -60,7 +54,7 @@ async function callBankrApi<T>(endpoint: string, fn: () => Promise<T>): Promise<
 
 async function init() {
   try {
-    console.log("[agent] Starting RSI Trading Agent...");
+    console.log("[agent] Starting Momentum Trading Agent...");
     console.log("[agent] Init step: validate API key");
     const valid = await callBankrApi("bankr.validateApiKey", () => validateApiKey());
     if (!valid) {
@@ -98,81 +92,20 @@ async function cycle() {
     battleId: BATTLE_ID,
   };
   try {
-    if (isDailyLimitHit()) {
-      await log("trade", "Daily loss limit hit, pausing trading", {
-        agent_id: AGENT_ID,
-        battle_id: BATTLE_ID,
-      });
-      return;
-    }
-    await log("scanning", "Starting new RSI scan cycle...", {
+    await log("scanning", "Starting new momentum scan cycle...", {
       agent_id: AGENT_ID,
       battle_id: BATTLE_ID,
     });
-    const tokens = await scanTrends(ctx);
-    if (tokens.length === 0) {
-      await log("analysis", "No trending tokens found, skipping cycle.", {
-        agent_id: AGENT_ID,
-        battle_id: BATTLE_ID,
-      });
-      return;
-    }
-    for (const token of tokens) {
-      const { signal, rsi } = await getRSIForToken(ctx, token);
-      if (signal === "BUY") {
-        if (isTokenInCooldown(token)) {
-          await log("trade", `${token} in cooldown, skipping`, {
-            agent_id: AGENT_ID,
-            battle_id: BATTLE_ID,
-          });
-          continue;
-        }
-        if (AGENT_DRY_RUN) {
-          await log(
-            "trade",
-            `[DRY RUN] BUY signal for ${token} at RSI ${rsi.toFixed(2)} — skipping trade.`,
-            { agent_id: AGENT_ID, battle_id: BATTLE_ID }
-          );
-        } else {
-          if (hasReachedMaxPositions()) {
-            await log("trade", `Max positions reached, skipping BUY for ${token}`, {
-              agent_id: AGENT_ID,
-              battle_id: BATTLE_ID,
-            });
-            continue;
-          }
-          const result = await executeTrade(ctx, { amountIn: AGENT_TRADE_AMOUNT, tokenIn: "USDC", tokenOut: token });
-          if (result) {
-            updateTokenCooldown(token);
-            addOpenPosition(token);
-          }
-        }
-      } else if (signal === "SELL") {
-        if (isTokenInCooldown(token)) {
-          await log("trade", `${token} in cooldown, skipping`, {
-            agent_id: AGENT_ID,
-            battle_id: BATTLE_ID,
-          });
-          continue;
-        }
-        if (AGENT_DRY_RUN) {
-          await log(
-            "trade",
-            `[DRY RUN] SELL signal for ${token} at RSI ${rsi.toFixed(2)} — skipping trade.`,
-            { agent_id: AGENT_ID, battle_id: BATTLE_ID }
-          );
-        } else {
-          const result = await executeTrade(ctx, { amountIn: AGENT_TRADE_AMOUNT, tokenIn: token, tokenOut: "USDC" });
-          if (result) {
-            updateTokenCooldown(token);
-            removeOpenPosition(token);
-          }
-        }
-      } else {
-        await log("analysis", `${token} RSI ${rsi.toFixed(2)} — holding, no trade.`, {
+    const analysis = await scanTrends(ctx);
+    const trade = await decideAndTrade(ctx, analysis);
+    if (trade) {
+      if (AGENT_DRY_RUN) {
+        await log("trade", `[DRY RUN] Would trade ${trade.amountIn} ${trade.tokenIn} → ${trade.tokenOut} — skipping.`, {
           agent_id: AGENT_ID,
           battle_id: BATTLE_ID,
         });
+      } else {
+        await executeTrade(ctx, trade);
       }
     }
     await checkBalance(ctx);
