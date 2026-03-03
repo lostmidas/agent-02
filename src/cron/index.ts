@@ -327,5 +327,3 @@ export function startSelfImprovementCron(): void {
     void runSelfImprovementCycle();
   });
 }
-
-startSelfImprovementCron();
