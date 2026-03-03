@@ -133,11 +133,9 @@ export function decideAndTrade(
     const pick = picksByToken.get(tokenUpper);
     const shouldSell = !pick || pick.direction === "down";
     if (shouldSell) {
-      const tokenAmount = amounts[tokenUpper] ?? usdValue;
       const sellUsd = Math.max(0.50, (usdValue * MAX_TRADE_PCT) / 100);
-      const sellTokenAmount = (sellUsd / usdValue) * tokenAmount;
       trades.push({
-        amountIn: sellTokenAmount.toFixed(6),
+        amountIn: `$${sellUsd.toFixed(2)}`,
         tokenIn: tokenUpper,
         tokenOut: "USDC",
       });
@@ -188,7 +186,7 @@ export async function executeTrade(
     const result = await promptAndPoll(
       "swap " +
         trade.amountIn +
-        " " +
+        " of " +
         trade.tokenIn +
         " to " +
         trade.tokenOut +
