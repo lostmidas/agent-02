@@ -131,7 +131,7 @@ export function decideAndTrade(
     const tokenUpper = token.toUpperCase();
     if (skip.has(tokenUpper) || usdValue <= 0.5) continue;
     const pick = picksByToken.get(tokenUpper);
-    const shouldSell = !pick || pick.direction === "down";
+    const shouldSell = !pick || pick.direction === "up";
     if (shouldSell) {
       const sellUsd = Math.max(0.50, (usdValue * MAX_TRADE_PCT) / 100);
       trades.push({
@@ -143,7 +143,7 @@ export function decideAndTrade(
   }
 
   const buyCandidates = picks.filter(
-    (p) => p.direction === "up" && (p.conviction === "high" || p.conviction === "medium") && !skip.has(p.token)
+    (p) => p.direction === "down" && (p.conviction === "high" || p.conviction === "medium") && !skip.has(p.token)
   );
   if (buyCandidates.length > 0) {
     const best = buyCandidates.find((c) => c.conviction === "high") || buyCandidates[0];
