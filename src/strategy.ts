@@ -97,7 +97,8 @@ export async function scanTrends(ctx: CycleContext): Promise<string> {
 
 export async function decideAndTrade(
   ctx: CycleContext,
-  analysis: string
+  analysis: string,
+  currentBalance: number
 ): Promise<{ amountIn: string; tokenIn: string; tokenOut: string } | null> {
   const picks: { token: string; direction: string; conviction: string }[] = [];
   const pickRegex = /\b([A-Z][A-Z0-9]{1,9})\b\s*[-–—]\s*(up|down)\s*[-–—]\s*(high|medium|low)/gi;
@@ -124,7 +125,7 @@ export async function decideAndTrade(
   }
 
   const best = candidates.find((c) => c.conviction === "high") || candidates[0];
-  const amountIn = Math.max(0.5, Math.floor(100 * MAX_TRADE_PCT) / 100).toFixed(2);
+  const amountIn = Math.max(0.5, (currentBalance * MAX_TRADE_PCT) / 100).toFixed(2);
 
   await log("analysis", `Picked ${best.token} (${best.conviction} conviction, trending ${best.direction}). Trading ${amountIn} USDC.`, {
     raw_data: { best, candidates, amountIn },

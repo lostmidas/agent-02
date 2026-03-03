@@ -97,7 +97,8 @@ async function cycle() {
       battle_id: BATTLE_ID,
     });
     const analysis = await scanTrends(ctx);
-    const trade = await decideAndTrade(ctx, analysis);
+    const { totalUsd } = await checkBalance(ctx);
+    const trade = await decideAndTrade(ctx, analysis, totalUsd);
     if (trade) {
       if (AGENT_DRY_RUN) {
         await log("trade", `[DRY RUN] Would trade ${trade.amountIn} ${trade.tokenIn} → ${trade.tokenOut} — skipping.`, {
