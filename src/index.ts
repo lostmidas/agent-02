@@ -6,11 +6,11 @@ import {
   decideAndTrade,
   executeTrade,
   checkBalance,
+  MAX_TRADE_PCT,
 } from "./strategy.js";
 
 const INTERVAL_MS = parseInt(process.env.AGENT_INTERVAL_MS || "180000", 10);
 const AGENT_DRY_RUN = /^(1|true|yes)$/i.test(process.env.AGENT_DRY_RUN || "false");
-const AGENT_TRADE_AMOUNT = process.env.AGENT_TRADE_AMOUNT || "10";
 const API_TIMEOUT_MS = 30_000;
 const AGENT_ID = process.env.AGENT_ID;
 const BATTLE_ID = process.env.BATTLE_ID;
@@ -97,16 +97,30 @@ async function cycle() {
       battle_id: BATTLE_ID,
     });
     const analysis = await scanTrends(ctx);
-    const { totalUsd } = await checkBalance(ctx);
-    const trade = await decideAndTrade(ctx, analysis, totalUsd);
-    if (trade) {
-      if (AGENT_DRY_RUN) {
-        await log("trade", `[DRY RUN] Would trade ${trade.amountIn} ${trade.tokenIn} → ${trade.tokenOut} — skipping.`, {
-          agent_id: AGENT_ID,
-          battle_id: BATTLE_ID,
-        });
-      } else {
-        await executeTrade(ctx, trade);
+    const { totalUsd, breakdown, amounts } = await checkBalance(ctx);
+    const trades = decideAndTrade(ctx, analysis, totalUsd, breakdown, amounts);
+    const sells = trades.filter((t) => t.tokenIn !== "USDC");
+    const buy = trades.find((t) => t.tokenIn === "USDC");
+
+    if (AGENT_DRY_RUN) {
+      for (const t of trades) {
+        await log(
+          "trade",
+          `[DRY RUN] Would trade ${t.amountIn} ${t.tokenIn} → ${t.tokenOut} — skipping.`,
+          { agent_id: AGENT_ID, battle_id: BATTLE_ID }
+        );
+      }
+    } else {
+      for (const t of sells) {
+        await executeTrade(ctx, t);
+      }
+      if (buy) {
+        const { totalUsd: newTotalUsd, breakdown: newBreakdown } = await checkBalance(ctx);
+        const buyAmount = Math.max(0.50, (newTotalUsd * MAX_TRADE_PCT) / 100).toFixed(2);
+        const usdcBalance = newBreakdown["USDC"] ?? 0;
+        if (usdcBalance >= parseFloat(buyAmount)) {
+          await executeTrade(ctx, { amountIn: buyAmount, tokenIn: "USDC", tokenOut: buy.tokenOut });
+        }
       }
     }
     await checkBalance(ctx);

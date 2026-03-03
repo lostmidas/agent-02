@@ -3,7 +3,7 @@ import { log, insertTrade, updateTrade, insertBalance } from "./db.js";
 
 const API_TIMEOUT_MS = 30_000;
 const POLL_JOB_TIMEOUT_MS = 300_000;
-const MAX_TRADE_PCT = parseInt(process.env.AGENT_MAX_TRADE_PCT || "15", 10);
+export const MAX_TRADE_PCT = parseInt(process.env.AGENT_MAX_TRADE_PCT || "15", 10);
 const AGENT_SLIPPAGE = process.env.AGENT_SLIPPAGE || "3";
 
 interface CycleContext {
@@ -95,11 +95,13 @@ export async function scanTrends(ctx: CycleContext): Promise<string> {
   return result.response;
 }
 
-export async function decideAndTrade(
+export function decideAndTrade(
   ctx: CycleContext,
   analysis: string,
-  currentBalance: number
-): Promise<{ amountIn: string; tokenIn: string; tokenOut: string } | null> {
+  currentBalance: number,
+  breakdown: Record<string, number>,
+  amounts: Record<string, number>
+): { amountIn: string; tokenIn: string; tokenOut: string }[] {
   const picks: { token: string; direction: string; conviction: string }[] = [];
   const pickRegex = /\b([A-Z][A-Z0-9]{1,9})\b\s*[-–—]\s*(up|down)\s*[-–—]\s*(high|medium|low)/gi;
   let match;
@@ -112,27 +114,37 @@ export async function decideAndTrade(
   }
 
   const skip = new Set(["USDC", "USDT", "DAI", "USD", "ETH", "WETH"]);
-  const candidates = picks.filter(
-    (p) => p.direction === "up" && (p.conviction === "high" || p.conviction === "medium") && !skip.has(p.token)
-  );
+  const picksByToken = new Map(picks.map((p) => [p.token, p]));
 
-  if (candidates.length === 0) {
-    await log("analysis", "No high/medium conviction 'up' picks found, skipping trade", {
-      raw_data: { picks },
-      thread_id: ctx.threadId,
-    });
-    return null;
+  const trades: { amountIn: string; tokenIn: string; tokenOut: string }[] = [];
+
+  for (const [token, usdValue] of Object.entries(breakdown)) {
+    const tokenUpper = token.toUpperCase();
+    if (skip.has(tokenUpper) || usdValue <= 0.5) continue;
+    const pick = picksByToken.get(tokenUpper);
+    const shouldSell = !pick || pick.direction === "down";
+    if (shouldSell) {
+      const tokenAmount = amounts[tokenUpper] ?? usdValue;
+      const sellUsd = Math.max(0.50, (usdValue * MAX_TRADE_PCT) / 100);
+      const sellTokenAmount = (sellUsd / usdValue) * tokenAmount;
+      trades.push({
+        amountIn: sellTokenAmount.toFixed(6),
+        tokenIn: tokenUpper,
+        tokenOut: "USDC",
+      });
+    }
   }
 
-  const best = candidates.find((c) => c.conviction === "high") || candidates[0];
-  const amountIn = Math.max(0.5, (currentBalance * MAX_TRADE_PCT) / 100).toFixed(2);
+  const buyCandidates = picks.filter(
+    (p) => p.direction === "up" && (p.conviction === "high" || p.conviction === "medium") && !skip.has(p.token)
+  );
+  if (buyCandidates.length > 0) {
+    const best = buyCandidates.find((c) => c.conviction === "high") || buyCandidates[0];
+    const buyAmount = Math.max(0.50, (currentBalance * MAX_TRADE_PCT) / 100).toFixed(2);
+    trades.push({ amountIn: buyAmount, tokenIn: "USDC", tokenOut: best.token });
+  }
 
-  await log("analysis", `Picked ${best.token} (${best.conviction} conviction, trending ${best.direction}). Trading ${amountIn} USDC.`, {
-    raw_data: { best, candidates, amountIn },
-    thread_id: ctx.threadId,
-  });
-
-  return { amountIn, tokenIn: "USDC", tokenOut: best.token };
+  return trades;
 }
 
 export async function executeTrade(
@@ -153,6 +165,17 @@ export async function executeTrade(
   });
 
   try {
+    console.log(
+      "[trade] Submitting swap prompt: " +
+        trade.amountIn +
+        " " +
+        trade.tokenIn +
+        " -> " +
+        trade.tokenOut +
+        " (slippage: " +
+        AGENT_SLIPPAGE +
+        "%)"
+    );
     const result = await promptAndPoll(
       "swap " +
         trade.amountIn +
@@ -166,7 +189,6 @@ export async function executeTrade(
       ctx.threadId,
       "Swapping " + trade.amountIn + " " + trade.tokenIn + " to " + trade.tokenOut
     );
-
     ctx.threadId = result.threadId;
 
     const txMatch = result.response.match(/0x[a-fA-F0-9]{64}/);
@@ -190,6 +212,11 @@ export async function executeTrade(
       thread_id: ctx.threadId,
     });
 
+    try {
+      await checkBalance(ctx);
+    } catch (balanceErr) {
+      console.warn("[trade] Post-trade balance check failed: " + String(balanceErr));
+    }
     return result;
   } catch (err) {
     if (tradeRow) {
@@ -212,13 +239,18 @@ export async function checkBalance(ctx: CycleContext) {
   ctx.threadId = result.threadId;
 
   const breakdown: Record<string, number> = {};
+  const amounts: Record<string, number> = {};
   let totalUsd = 0;
-  const lineRegex = /[\d,.]+ \w+ \(\$([\d,.]+)\)/g;
+  const lineRegex = /([\d,.]+) (\w+) \(\$([\d,.]+)\)/g;
   let balMatch;
   while ((balMatch = lineRegex.exec(result.response)) !== null) {
-    const usdValue = parseFloat(balMatch[1].replace(/,/g, ""));
+    const amount = parseFloat(balMatch[1].replace(/,/g, ""));
+    const symbol = balMatch[2].toUpperCase();
+    const usdValue = parseFloat(balMatch[3].replace(/,/g, ""));
     if (!isNaN(usdValue) && usdValue > 0) {
       totalUsd += usdValue;
+      breakdown[symbol] = usdValue;
+      amounts[symbol] = amount;
     }
   }
 
@@ -228,5 +260,5 @@ export async function checkBalance(ctx: CycleContext) {
     thread_id: ctx.threadId,
   });
 
-  return { totalUsd, breakdown };
+  return { totalUsd, breakdown, amounts };
 }
