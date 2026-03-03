@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "while true; do npm run dev; echo '[agent] Restarting...'; sleep 2; done",
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
