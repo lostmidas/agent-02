@@ -1,6 +1,7 @@
 import "./env.js";
 import { validateApiKey, getUserInfo } from "@bankr/cli";
 import { log } from "./db.js";
+import { startSelfImprovementCron } from "./cron/index.js";
 import {
   scanTrends,
   decideAndTrade,
@@ -140,6 +141,7 @@ async function cycle() {
 
 async function main() {
   await init();
+  startSelfImprovementCron();
   while (running) {
     await cycle();
     console.log(`[agent] Sleeping ${INTERVAL_MS / 1000}s until next cycle...`);
