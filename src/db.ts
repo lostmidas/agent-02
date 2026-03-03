@@ -383,3 +383,27 @@ export async function insertSelfImprovementLog(entry: {
     console.error("[db] insertSelfImprovementLog unexpected error:", err);
   }
 }
+
+export async function getLatestTokensToWatch(
+  agentId: string,
+  battleId: string
+): Promise<string[]> {
+  try {
+    const { data, error } = await db
+      .from("self_improvement_log")
+      .select("tokens_to_watch")
+      .eq("agent_id", agentId)
+      .eq("battle_id", battleId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("[db] getLatestTokensToWatch error:", error.message);
+      return [];
+    }
+    return data?.tokens_to_watch ?? [];
+  } catch (err) {
+    console.error("[db] getLatestTokensToWatch unexpected error:", err);
+    return [];
+  }
+}
