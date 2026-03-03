@@ -213,37 +213,12 @@ export async function checkBalance(ctx: CycleContext) {
 
   const breakdown: Record<string, number> = {};
   let totalUsd = 0;
-  const lineRegex = /^(.+?)\s*[-–—]\s*[\d,.]+\s+\w+\s+\$([\d,.]+)/gm;
+  const lineRegex = /[\d,.]+ \w+ \(\$([\d,.]+)\)/g;
   let balMatch;
   while ((balMatch = lineRegex.exec(result.response)) !== null) {
-    const name = balMatch[1].trim();
-    const usdValue = parseFloat(balMatch[2].replace(/,/g, ""));
+    const usdValue = parseFloat(balMatch[1].replace(/,/g, ""));
     if (!isNaN(usdValue) && usdValue > 0) {
-      breakdown[name] = usdValue;
       totalUsd += usdValue;
-    }
-  }
-  if (totalUsd === 0) {
-    const fallbackRegex = /^(.+?)\s*[-–—]\s*[\d,.]+\s+\$([\d,.]+)/gm;
-    let fbMatch;
-    while ((fbMatch = fallbackRegex.exec(result.response)) !== null) {
-      const name = fbMatch[1].trim();
-      const usdValue = parseFloat(fbMatch[2].replace(/,/g, ""));
-      if (!isNaN(usdValue) && usdValue > 0) {
-        breakdown[name] = usdValue;
-        totalUsd += usdValue;
-      }
-    }
-  }
-  if (totalUsd === 0) {
-    const altRegex = /^([\d,.]+)\s+([A-Za-z0-9$._-]+)\s+\(\$([\d,.]+)\)/gm;
-    while ((balMatch = altRegex.exec(result.response)) !== null) {
-      const name = balMatch[2].trim();
-      const usdValue = parseFloat(balMatch[3].replace(/,/g, ""));
-      if (!isNaN(usdValue) && usdValue > 0) {
-        breakdown[name] = usdValue;
-        totalUsd += usdValue;
-      }
     }
   }
 
