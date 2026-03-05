@@ -1,5 +1,6 @@
 import { submitPrompt, pollJob } from "@bankr/cli";
 import { log, insertTrade, updateTrade, insertBalance } from "./db.js";
+import { ZERO_REACTION_PROMPT } from "./prompts.js";
 
 const API_TIMEOUT_MS = 30_000;
 const POLL_JOB_TIMEOUT_MS = 300_000;
@@ -274,7 +275,7 @@ export async function fireReaction(
   ctx: CycleContext,
   trade: { amountIn: string; tokenIn: string; tokenOut: string }
 ): Promise<void> {
-  const prompt = `You just executed a trade: ${trade.amountIn} ${trade.tokenIn} → ${trade.tokenOut}. You are MAX — aggressive, momentum-driven, unhinged. React to your own trade in 2-3 sentences. Talk to yourself. Hype it up or call it out. No financial advice. Raw personality only. Keep it under 40 words.`;
+  const prompt = ZERO_REACTION_PROMPT(trade);
   try {
     const result = await promptAndPoll(prompt, ctx.threadId, "Firing post-trade reaction...");
     await log("taunt", result.response.trim(), {
