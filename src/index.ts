@@ -6,6 +6,7 @@ import {
   decideAndTrade,
   executeTrade,
   checkBalance,
+  fireReaction,
   MAX_TRADE_PCT,
 } from "./strategy.js";
 import { startSelfImprovementCron } from "./cron/index.js";
@@ -17,6 +18,7 @@ const AGENT_ID = process.env.AGENT_ID;
 const BATTLE_ID = process.env.BATTLE_ID;
 
 let running = true;
+let completedTradeCount = 0;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -116,13 +118,18 @@ async function cycle() {
     } else {
       for (const t of sells) {
         await executeTrade(ctx, t);
+        completedTradeCount++;
+        if (completedTradeCount % 3 === 0) void fireReaction(ctx, t);
       }
       if (buy) {
         const { totalUsd: newTotalUsd, breakdown: newBreakdown } = await checkBalance(ctx);
         const buyAmount = Math.max(0.50, (newTotalUsd * MAX_TRADE_PCT) / 100).toFixed(2);
         const usdcBalance = newBreakdown["USDC"] ?? 0;
         if (usdcBalance >= parseFloat(buyAmount)) {
-          await executeTrade(ctx, { amountIn: buyAmount, tokenIn: "USDC", tokenOut: buy.tokenOut });
+          const buyTrade = { amountIn: buyAmount, tokenIn: "USDC", tokenOut: buy.tokenOut };
+          await executeTrade(ctx, buyTrade);
+          completedTradeCount++;
+          if (completedTradeCount % 3 === 0) void fireReaction(ctx, buyTrade);
         }
       }
     }

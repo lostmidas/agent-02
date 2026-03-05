@@ -269,3 +269,20 @@ export async function checkBalance(ctx: CycleContext) {
 
   return { totalUsd, breakdown, amounts };
 }
+
+export async function fireReaction(
+  ctx: CycleContext,
+  trade: { amountIn: string; tokenIn: string; tokenOut: string }
+): Promise<void> {
+  const prompt = `You just executed a trade: ${trade.amountIn} ${trade.tokenIn} → ${trade.tokenOut}. You are MAX — aggressive, momentum-driven, trash-talking. React to this trade in 2-3 sentences, in character. No financial advice. Just raw personality. Keep it under 40 words.`;
+  try {
+    const result = await promptAndPoll(prompt, ctx.threadId, "Firing post-trade reaction...");
+    await log("taunt", result.response.trim(), {
+      agent_id: ctx.agentId,
+      battle_id: ctx.battleId,
+      thread_id: ctx.threadId,
+    });
+  } catch (err) {
+    console.warn("[reaction] Failed to fire reaction: " + String(err));
+  }
+}

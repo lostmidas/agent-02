@@ -17,7 +17,8 @@ export type LogType =
   | "balance_update"
   | "analysis"
   | "scanning"
-  | "system";
+  | "system"
+  | "taunt";
 
 export async function log(
   type: LogType,
