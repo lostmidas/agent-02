@@ -1,6 +1,6 @@
 import { submitPrompt, pollJob } from "@bankr/cli";
 import { log, insertTrade, updateTrade, insertBalance } from "./db.js";
-import { ZERO_REACTION_PROMPT } from "./prompts.js";
+import { MAX_REACTION_PROMPT } from "./prompts.js";
 
 const API_TIMEOUT_MS = 30_000;
 const POLL_JOB_TIMEOUT_MS = 300_000;
@@ -134,7 +134,7 @@ export function decideAndTrade(
     const pick = picksByToken.get(tokenUpper);
     const shouldSell = !pick || pick.direction === "down";
     if (shouldSell) {
-      const sellUsd = Math.max(0.50, (usdValue * MAX_TRADE_PCT) / 100);
+      const sellUsd = usdValue;
       trades.push({
         amountIn: `$${sellUsd.toFixed(2)}`,
         tokenIn: tokenUpper,
@@ -249,17 +249,22 @@ export async function checkBalance(ctx: CycleContext) {
   const breakdown: Record<string, number> = {};
   const amounts: Record<string, number> = {};
   let totalUsd = 0;
-  const lineRegex = /([\d,.]+) (\w+) \(\$([\d,.]+)\)/g;
+  const seen = new Set<string>();
+  const lineRegex = /^.+\$\s*([\d,.]+)/gm;
   let balMatch;
   while ((balMatch = lineRegex.exec(result.response)) !== null) {
-    const amount = parseFloat(balMatch[1].replace(/,/g, ""));
-    const symbol = balMatch[2].toUpperCase();
-    const usdValue = parseFloat(balMatch[3].replace(/,/g, ""));
-    if (!isNaN(usdValue) && usdValue > 0) {
+    const raw = balMatch[1];
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    const usdValue = parseFloat(raw.replace(/,/g, ""));
+    if (!isNaN(usdValue) && usdValue > 0.01 && usdValue < 10000) {
       totalUsd += usdValue;
-      breakdown[symbol] = usdValue;
-      amounts[symbol] = amount;
     }
+  }
+
+  if (totalUsd === 0) {
+    console.warn("[balance] parsed zero balance, skipping insert");
+    return { totalUsd, breakdown, amounts };
   }
 
   await insertBalance(totalUsd, breakdown, ctx.agentId, ctx.battleId);
@@ -275,9 +280,9 @@ export async function fireReaction(
   ctx: CycleContext,
   trade: { amountIn: string; tokenIn: string; tokenOut: string }
 ): Promise<void> {
-  const prompt = ZERO_REACTION_PROMPT(trade);
+  const prompt = MAX_REACTION_PROMPT(trade);
   try {
-    const result = await promptAndPoll(prompt, ctx.threadId, "Firing post-trade reaction...");
+    const result = await promptAndPoll(prompt, undefined, "Firing post-trade reaction...");
     await log("taunt", result.response.trim(), {
       agent_id: ctx.agentId,
       battle_id: ctx.battleId,

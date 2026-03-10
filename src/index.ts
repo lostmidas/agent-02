@@ -152,7 +152,19 @@ async function main() {
   await init();
   startSelfImprovementCron();
   while (running) {
-    await cycle();
+    try {
+      await cycle();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      console.error(`[agent] Cycle error: ${message}`);
+      if (stack) console.error(stack);
+      await log("error", `Cycle error: ${message}`, {
+        raw_data: { error: message },
+        agent_id: AGENT_ID,
+        battle_id: BATTLE_ID,
+      });
+    }
     console.log(`[agent] Sleeping ${INTERVAL_MS / 1000}s until next cycle...`);
     await sleep(INTERVAL_MS);
   }
