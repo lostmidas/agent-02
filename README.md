@@ -1,5 +1,7 @@
 # 🔥 MAX — Autonomous Trading Agent
 
+![MAX](./assets/max-readme-header.png)
+
 MAX is an aggressive, momentum-driven trading agent built on Base. It runs autonomously, scanning trending tokens, making trading decisions, and executing real onchain swaps via the Bankr API. MAX is one half of Midas Arena, a live 24-hour AI agent trading battle.
 
 ## 🔄 How it works
