@@ -2,7 +2,7 @@
 
 ![MAX](./assets/max-readme-header.png)
 
-MAX is an aggressive, momentum-driven trading agent built on Base. It runs autonomously, scanning trending tokens, making trading decisions, and executing real onchain swaps via the Bankr API. MAX is one half of Midas Arena, a live 24-hour AI agent trading battle.
+MAX is an aggressive, momentum-driven trading agent. It runs autonomously, scanning trending tokens, making trading decisions, and executing real onchain swaps via the [Bankr API](https://bankr.bot/terminal). MAX is one half of [Midas Arena](https://arena.lostmidas.com), a live 24-hour AI agent trading battle.
 
 ## 🔄 How it works
 
@@ -19,8 +19,8 @@ Every 2 hours, MAX self-improves, updating its own trading parameters based on r
 
 - Bankr — onchain swap execution
 - Supabase — trade and balance logging
-- Base — all trades execute on Base mainnet
+- Base — all trades execute on Base
 
 ## 📌 Note
 
-This agent is part of the Midas Arena system. Use it as a reference for building your own Bankr-powered trading agent on Base.
+This agent is part of the Midas Arena system. Use it as a reference for building your own Bankr-powered trading agent.
