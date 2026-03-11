@@ -249,17 +249,20 @@ export async function checkBalance(ctx: CycleContext) {
   const breakdown: Record<string, number> = {};
   const amounts: Record<string, number> = {};
   let totalUsd = 0;
-  const seen = new Set<string>();
-  const lineRegex = /^.+\$\s*([\d,.]+)/gm;
-  let balMatch;
-  while ((balMatch = lineRegex.exec(result.response)) !== null) {
-    const raw = balMatch[1];
-    if (seen.has(raw)) continue;
-    seen.add(raw);
-    const usdValue = parseFloat(raw.replace(/,/g, ""));
-    if (!isNaN(usdValue) && usdValue > 0.01 && usdValue < 10000) {
-      totalUsd += usdValue;
+  const lines = result.response.split('\n');
+  for (const line of lines) {
+    const dollarMatch = line.match(/\(?\$?([\d,.]+)\)?$/);
+    if (!dollarMatch) continue;
+    const usdValue = parseFloat(dollarMatch[1].replace(/,/g, ''));
+    if (isNaN(usdValue) || usdValue <= 0.01 || usdValue >= 10000) continue;
+    const parenSymbol = line.match(/\(([A-Z][A-Z0-9]{1,9})\)/);
+    const bareSymbol = line.match(/\b([A-Z][A-Z0-9]{1,9})\s*-\s*[\d]/);
+    const symbol = parenSymbol ? parenSymbol[1] : bareSymbol ? bareSymbol[1] : null;
+    const skip = new Set(["SOL","EVM","MAINNET","POLYGON","UNICHAIN","COMBINED","TOTAL","SOLANA"]);
+    if (symbol && !skip.has(symbol)) {
+      breakdown[symbol] = usdValue;
     }
+    totalUsd += usdValue;
   }
 
   if (totalUsd === 0) {
