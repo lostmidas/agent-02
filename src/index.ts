@@ -91,6 +91,7 @@ async function init() {
 
 async function cycle() {
   const ctx: { threadId?: string; agentId?: string; battleId?: string } = {
+    threadId: undefined,
     agentId: AGENT_ID,
     battleId: BATTLE_ID,
   };
