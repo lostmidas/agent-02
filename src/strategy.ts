@@ -32,13 +32,21 @@ async function callBankrApi<T>(endpoint: string, fn: () => Promise<T>, timeoutMs
     console.log(`[agent] Calling complete: ${endpoint}`);
     return result as T;
   } catch (error) {
-    if (error instanceof ApiTimeoutError) {
-      console.error(`[agent] TIMEOUT: ${error.endpoint}`);
-    }
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
-    console.error(`[agent] ERROR: ${message}`);
-    if (stack) console.error(stack);
+    console.error(
+      "[BANKR_DIAGNOSTIC]",
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        agent_id: process.env.AGENT_ID,
+        event: "api_error",
+        endpoint,
+        error_type: error instanceof ApiTimeoutError ? "timeout" : "error",
+        error_message: message,
+        timeout_ms: timeoutMs,
+        stack,
+      })
+    );
     throw error;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
