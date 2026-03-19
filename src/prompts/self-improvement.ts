@@ -102,8 +102,8 @@ If you executed fewer than 3 trades last cycle, first check why:
 A dead agent loses by default.
 
 MUTATION BOUNDS — you may only adjust within these ranges:
-- AGENT_TRADE_AMOUNT: $0.50 → $5.00
-- AGENT_COOLDOWN_HOURS: 0.5 → 8
+- AGENT_TRADE_AMOUNT: $10 → $30
+- AGENT_COOLDOWN_HOURS: 0.25 → 1
 - AGENT_MAX_POSITIONS: 1 → 4
 - AGENT_INTERVAL_MS: 180000 → 600000
 

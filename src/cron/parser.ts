@@ -16,8 +16,8 @@ export type ParsedResponse = {
 };
 
 const PARAMETER_BOUNDS = {
-  AGENT_TRADE_AMOUNT: { min: 5, max: 25 },
-  AGENT_COOLDOWN_HOURS: { min: 0.5, max: 1 },
+  AGENT_TRADE_AMOUNT: { min: 10, max: 30 },
+  AGENT_COOLDOWN_HOURS: { min: 0.25, max: 1 },
   AGENT_MAX_POSITIONS: { min: 2, max: 4 },
   AGENT_INTERVAL_MS: { min: 120000, max: 600000 },
 } as const;
