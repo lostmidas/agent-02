@@ -269,8 +269,8 @@ export async function checkBalance(ctx: CycleContext) {
     const skip = new Set(["SOL","EVM","MAINNET","POLYGON","UNICHAIN","COMBINED","TOTAL","SOLANA"]);
     if (symbol && !skip.has(symbol)) {
       breakdown[symbol] = usdValue;
+      totalUsd += usdValue;
     }
-    totalUsd += usdValue;
   }
 
   if (totalUsd === 0) {
