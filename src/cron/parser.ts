@@ -22,6 +22,8 @@ const PARAMETER_BOUNDS = {
   AGENT_COOLDOWN_HOURS: { min: 0.25, max: 1 },
   AGENT_MAX_POSITIONS: { min: 2, max: 4 },
   AGENT_INTERVAL_MS: { min: 120000, max: 600000 },
+  AGENT_TAKE_PROFIT_PCT: { min: 2, max: 15 },
+  AGENT_STOP_LOSS_PCT: { min: 1, max: 10 },
 } as const;
 
 const REQUIRED_TOP_LEVEL_FIELDS = [
