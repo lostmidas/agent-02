@@ -4,6 +4,8 @@ export type ParsedResponse = {
     AGENT_COOLDOWN_HOURS: number;
     AGENT_MAX_POSITIONS: number;
     AGENT_INTERVAL_MS: number;
+    AGENT_TAKE_PROFIT_PCT: number;
+    AGENT_STOP_LOSS_PCT: number;
   };
   cycle_assessment: string;
   activity_status: string;
@@ -92,6 +94,8 @@ export function parseResponse(raw: string): ParsedResponse {
     "AGENT_COOLDOWN_HOURS",
     "AGENT_MAX_POSITIONS",
     "AGENT_INTERVAL_MS",
+    "AGENT_TAKE_PROFIT_PCT",
+    "AGENT_STOP_LOSS_PCT",
   ];
   const missingParameterFields = hasParametersRecord
     ? requiredParameterFields.filter((field) => !hasField(parametersRecord, field))
@@ -106,11 +110,15 @@ export function parseResponse(raw: string): ParsedResponse {
   const cooldownHours = Number(parametersRecord.AGENT_COOLDOWN_HOURS);
   const maxPositions = Number(parametersRecord.AGENT_MAX_POSITIONS);
   const intervalMs = Number(parametersRecord.AGENT_INTERVAL_MS);
+  const takeProfitPct = Number(parametersRecord.AGENT_TAKE_PROFIT_PCT);
+  const stopLossPct = Number(parametersRecord.AGENT_STOP_LOSS_PCT);
   const hasInvalidParameterValue =
     !Number.isFinite(tradeAmount) ||
     !Number.isFinite(cooldownHours) ||
     !Number.isFinite(maxPositions) ||
-    !Number.isFinite(intervalMs);
+    !Number.isFinite(intervalMs) ||
+    !Number.isFinite(takeProfitPct) ||
+    !Number.isFinite(stopLossPct);
   const hasInvalidTopLevelType =
     typeof parsedRecord.cycle_assessment !== "string" ||
     typeof parsedRecord.activity_status !== "string" ||
@@ -133,6 +141,8 @@ export function parseResponse(raw: string): ParsedResponse {
       AGENT_COOLDOWN_HOURS: clampParameter("AGENT_COOLDOWN_HOURS", cooldownHours, agentId),
       AGENT_MAX_POSITIONS: clampParameter("AGENT_MAX_POSITIONS", maxPositions, agentId),
       AGENT_INTERVAL_MS: clampParameter("AGENT_INTERVAL_MS", intervalMs, agentId),
+      AGENT_TAKE_PROFIT_PCT: clampParameter("AGENT_TAKE_PROFIT_PCT", takeProfitPct, agentId),
+      AGENT_STOP_LOSS_PCT: clampParameter("AGENT_STOP_LOSS_PCT", stopLossPct, agentId),
     },
     cycle_assessment: parsedRecord.cycle_assessment as string,
     activity_status: parsedRecord.activity_status as string,

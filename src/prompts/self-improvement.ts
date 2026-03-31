@@ -5,6 +5,8 @@ export type PromptParams = {
   cooldownHours: number
   maxPositions: number
   intervalMs: number
+  takeProfitPct: number
+  stopLossPct: number
   currentBalance: number
   previousBalance: number
   cyclePnl: number
@@ -26,6 +28,8 @@ export function buildPrompt(params: PromptParams): string {
     cooldownHours,
     maxPositions,
     intervalMs,
+    takeProfitPct,
+    stopLossPct,
     currentBalance,
     previousBalance,
     cyclePnl,
@@ -106,6 +110,12 @@ MUTATION BOUNDS — you may only adjust within these ranges:
 - AGENT_COOLDOWN_HOURS: 0.25 → 1
 - AGENT_MAX_POSITIONS: 1 → 4
 - AGENT_INTERVAL_MS: 180000 → 600000
+- AGENT_TAKE_PROFIT_PCT: 2 → 15
+- AGENT_STOP_LOSS_PCT: 1 → 10
+
+YOUR CURRENT EXIT THRESHOLDS:
+- Take profit: ${takeProfitPct}%
+- Stop loss: ${stopLossPct}%
 
 HOLD RULE:
 You may choose to make no changes this cycle ONLY if your consecutive 
@@ -124,7 +134,9 @@ Respond in this exact JSON format:
     "AGENT_TRADE_AMOUNT": [number],
     "AGENT_COOLDOWN_HOURS": [number],
     "AGENT_MAX_POSITIONS": [number],
-    "AGENT_INTERVAL_MS": [number]
+    "AGENT_INTERVAL_MS": [number],
+    "AGENT_TAKE_PROFIT_PCT": [number],
+    "AGENT_STOP_LOSS_PCT": [number]
   },
   "cycle_assessment": "good | neutral | bad",
   "activity_status": "active | inactive",

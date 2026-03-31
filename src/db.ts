@@ -48,6 +48,7 @@ export async function insertTrade(trade: {
   token_out: string;
   amount_in: string;
   amount_out?: string;
+  entry_price_usd?: number;
   status: "pending" | "completed" | "failed";
   job_id?: string;
   tx_hash?: string;
@@ -62,6 +63,7 @@ export async function insertTrade(trade: {
       token_out: trade.token_out,
       amount_in: trade.amount_in,
       amount_out: trade.amount_out ?? null,
+      entry_price_usd: trade.entry_price_usd ?? null,
       status: trade.status,
       job_id: trade.job_id ?? null,
       tx_hash: trade.tx_hash ?? null,
@@ -416,5 +418,33 @@ export async function getLatestTokensToWatch(
   } catch (err) {
     console.error("[db] getLatestTokensToWatch unexpected error:", err);
     return [];
+  }
+}
+
+export async function getEntryPrice(
+  agentId: string,
+  battleId: string,
+  token: string
+): Promise<number | null> {
+  try {
+    const { data, error } = await db
+      .from("trades")
+      .select("entry_price_usd")
+      .eq("agent_id", agentId)
+      .eq("battle_id", battleId)
+      .eq("token_out", token)
+      .eq("status", "completed")
+      .not("entry_price_usd", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("[db] getEntryPrice error:", error.message);
+      return null;
+    }
+    return data?.entry_price_usd ?? null;
+  } catch (err) {
+    console.error("[db] getEntryPrice unexpected error:", err);
+    return null;
   }
 }

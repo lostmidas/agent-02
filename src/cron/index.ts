@@ -239,6 +239,8 @@ export async function runSelfImprovementCycle(): Promise<void> {
     const cooldownHours = getEnvNumber("AGENT_COOLDOWN_HOURS", 1);
     const maxPositions = getEnvNumber("AGENT_MAX_POSITIONS", 1);
     const intervalMs = getEnvNumber("AGENT_INTERVAL_MS", 180000);
+    const takeProfitPct = getEnvNumber("AGENT_TAKE_PROFIT_PCT", 5);
+    const stopLossPct = getEnvNumber("AGENT_STOP_LOSS_PCT", 3);
 
     const prompt = buildPrompt({
       personality: MAX_PERSONALITY,
@@ -247,6 +249,8 @@ export async function runSelfImprovementCycle(): Promise<void> {
       cooldownHours,
       maxPositions,
       intervalMs,
+      takeProfitPct,
+      stopLossPct,
       currentBalance,
       previousBalance,
       cyclePnl,

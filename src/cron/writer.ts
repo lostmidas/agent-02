@@ -29,6 +29,8 @@ export async function writeBackAndRestart(
   updatedEnv = replaceParameterLine(updatedEnv, "AGENT_COOLDOWN_HOURS", params.AGENT_COOLDOWN_HOURS);
   updatedEnv = replaceParameterLine(updatedEnv, "AGENT_MAX_POSITIONS", params.AGENT_MAX_POSITIONS);
   updatedEnv = replaceParameterLine(updatedEnv, "AGENT_INTERVAL_MS", params.AGENT_INTERVAL_MS);
+  updatedEnv = replaceParameterLine(updatedEnv, "AGENT_TAKE_PROFIT_PCT", params.AGENT_TAKE_PROFIT_PCT);
+  updatedEnv = replaceParameterLine(updatedEnv, "AGENT_STOP_LOSS_PCT", params.AGENT_STOP_LOSS_PCT);
 
   try {
     await writeFile(TEMP_ENV_PATH, updatedEnv, "utf-8");

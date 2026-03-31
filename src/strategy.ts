@@ -1,11 +1,43 @@
 import { submitPrompt, pollJob } from "@bankr/cli";
-import { log, insertTrade, updateTrade, insertBalance } from "./db.js";
+import { log, insertTrade, updateTrade, insertBalance, getEntryPrice } from "./db.js";
 import { MAX_REACTION_PROMPT } from "./prompts.js";
 
 const API_TIMEOUT_MS = 30_000;
 const POLL_JOB_TIMEOUT_MS = 300_000;
 export const MAX_TRADE_PCT = parseInt(process.env.AGENT_MAX_TRADE_PCT || "15", 10);
 const AGENT_SLIPPAGE = process.env.AGENT_SLIPPAGE || "3";
+const TAKE_PROFIT_PCT = parseFloat(process.env.AGENT_TAKE_PROFIT_PCT || "5");
+const STOP_LOSS_PCT = parseFloat(process.env.AGENT_STOP_LOSS_PCT || "3");
+
+const TOKEN_ADDRESSES: Record<string, string> = {
+  MOLT: "0xb695559b26bb2c9703ef1935c37aeae9526bab07",
+  NOOK: "0xb233bdffd437e60fa451f62c6c09d3804d285ba3",
+  JUNO: "0x4e6c9f48f73e54ee5f3ab7e2992b2d733d0d0b07",
+  FELIX: "0xf30bf00edd0c22db54c9274b90d2a4c21fc09b07",
+  CLAWD: "0x9f86db9fc6f7c9408e8fda3ff8ce4e78ac7a6b07",
+  BNKR: "0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
+};
+
+async function getTokenPrice(token: string): Promise<number | null> {
+  try {
+    const address = TOKEN_ADDRESSES[token.toUpperCase()];
+    const url = `https://api.geckoterminal.com/api/v2/search/pools?query=${token}&network=base`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const pools = json?.data ?? [];
+    for (const pool of pools) {
+      const baseId: string = pool?.relationships?.base_token?.data?.id ?? "";
+      if (address && !baseId.toLowerCase().endsWith(address.toLowerCase())) continue;
+      const price = parseFloat(pool?.attributes?.base_token_price_usd);
+      if (!isNaN(price) && price > 0) return price;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[price] getTokenPrice failed for ${token}:`, err);
+    return null;
+  }
+}
 
 interface CycleContext {
   threadId?: string;
@@ -113,13 +145,13 @@ export async function scanTrends(
   return result.response;
 }
 
-export function decideAndTrade(
+export async function decideAndTrade(
   ctx: CycleContext,
   analysis: string,
   currentBalance: number,
   breakdown: Record<string, number>,
   amounts: Record<string, number>
-): { amountIn: string; tokenIn: string; tokenOut: string }[] {
+): Promise<{ amountIn: string; tokenIn: string; tokenOut: string; entryPriceUsd?: number }[]> {
   const picks: { token: string; direction: string; conviction: string }[] = [];
   const pickRegex = /\b([A-Z][A-Z0-9]{1,9})\b\s*[-–—]\s*(up|down)\s*[-–—]\s*(high|medium|low)/gi;
   let match;
@@ -134,17 +166,33 @@ export function decideAndTrade(
   const skip = new Set(["USDC", "USDT", "DAI", "USD", "ETH", "WETH"]);
   const picksByToken = new Map(picks.map((p) => [p.token, p]));
 
-  const trades: { amountIn: string; tokenIn: string; tokenOut: string }[] = [];
+  const trades: { amountIn: string; tokenIn: string; tokenOut: string; entryPriceUsd?: number }[] = [];
 
   for (const [token, usdValue] of Object.entries(breakdown)) {
     const tokenUpper = token.toUpperCase();
     if (skip.has(tokenUpper) || usdValue <= 0.5) continue;
     const pick = picksByToken.get(tokenUpper);
-    const shouldSell = !pick || pick.direction === "down";
+    const entryPrice = await getEntryPrice(ctx.agentId!, ctx.battleId!, tokenUpper);
+    const currentPrice = await getTokenPrice(tokenUpper);
+    let shouldSell = false;
+    if (entryPrice && currentPrice) {
+      const pnlPct = ((currentPrice - entryPrice) / entryPrice) * 100;
+      if (pnlPct >= TAKE_PROFIT_PCT) {
+        console.log(`[exit] ${tokenUpper} take profit triggered: +${pnlPct.toFixed(2)}%`);
+        shouldSell = true;
+      } else if (pnlPct <= -STOP_LOSS_PCT) {
+        console.log(`[exit] ${tokenUpper} stop loss triggered: ${pnlPct.toFixed(2)}%`);
+        shouldSell = true;
+      } else {
+        console.log(`[exit] ${tokenUpper} holding: ${pnlPct.toFixed(2)}% (tp: +${TAKE_PROFIT_PCT}% sl: -${STOP_LOSS_PCT}%)`);
+      }
+    } else {
+      console.warn(`[exit] ${tokenUpper} no price data, defaulting to scan-based exit`);
+      shouldSell = !pick || pick.direction === "down";
+    }
     if (shouldSell) {
-      const sellUsd = usdValue;
       trades.push({
-        amountIn: `$${sellUsd.toFixed(2)}`,
+        amountIn: `$${usdValue.toFixed(2)}`,
         tokenIn: tokenUpper,
         tokenOut: "USDC",
       });
@@ -157,7 +205,8 @@ export function decideAndTrade(
   if (buyCandidates.length > 0) {
     const best = buyCandidates.find((c) => c.conviction === "high") || buyCandidates[0];
     const buyAmount = Math.max(0.50, (currentBalance * MAX_TRADE_PCT) / 100).toFixed(2);
-    trades.push({ amountIn: buyAmount, tokenIn: "USDC", tokenOut: best.token });
+    const buyEntryPrice = await getTokenPrice(best.token);
+    trades.push({ amountIn: buyAmount, tokenIn: "USDC", tokenOut: best.token, entryPriceUsd: buyEntryPrice ?? undefined });
   }
 
   return trades;
@@ -165,7 +214,7 @@ export function decideAndTrade(
 
 export async function executeTrade(
   ctx: CycleContext,
-  trade: { amountIn: string; tokenIn: string; tokenOut: string }
+  trade: { amountIn: string; tokenIn: string; tokenOut: string; entryPriceUsd?: number }
 ) {
   await log("trade", "Executing swap: " + trade.amountIn + " " + trade.tokenIn + " to " + trade.tokenOut, {
     thread_id: ctx.threadId,
@@ -175,6 +224,7 @@ export async function executeTrade(
     token_in: trade.tokenIn,
     token_out: trade.tokenOut,
     amount_in: trade.amountIn,
+    entry_price_usd: trade.entryPriceUsd,
     status: "pending",
     agent_id: ctx.agentId,
     battle_id: ctx.battleId,
