@@ -18,25 +18,46 @@ const TOKEN_ADDRESSES: Record<string, string> = {
   BNKR: "0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
 };
 
-async function getTokenPrice(token: string): Promise<number | null> {
-  try {
-    const address = TOKEN_ADDRESSES[token.toUpperCase()];
-    const url = `https://api.geckoterminal.com/api/v2/search/pools?query=${token}&network=base`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const json = await res.json();
-    const pools = json?.data ?? [];
-    for (const pool of pools) {
-      const baseId: string = pool?.relationships?.base_token?.data?.id ?? "";
-      if (address && !baseId.toLowerCase().endsWith(address.toLowerCase())) continue;
-      const price = parseFloat(pool?.attributes?.base_token_price_usd);
-      if (!isNaN(price) && price > 0) return price;
-    }
-    return null;
-  } catch (err) {
-    console.warn(`[price] getTokenPrice failed for ${token}:`, err);
-    return null;
+let cachedPrices: Record<string, number> = {};
+let pricesCachedAt = 0;
+const PRICE_CACHE_TTL_MS = 60_000;
+
+async function fetchAllTokenPrices(): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (now - pricesCachedAt < PRICE_CACHE_TTL_MS && Object.keys(cachedPrices).length > 0) {
+    return cachedPrices;
   }
+  try {
+    const addresses = Object.values(TOKEN_ADDRESSES).join(",");
+    const url = `https://api.geckoterminal.com/api/v2/networks/base/tokens/multi/${addresses}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[price] GeckoTerminal fetch failed: ${res.status}`);
+      return cachedPrices;
+    }
+    const json = await res.json();
+    const prices: Record<string, number> = {};
+    for (const item of json?.data ?? []) {
+      const addr = item?.attributes?.address?.toLowerCase();
+      const price = parseFloat(item?.attributes?.price_usd);
+      if (addr && !isNaN(price) && price > 0) {
+        const symbol = Object.entries(TOKEN_ADDRESSES).find(([, v]) => v.toLowerCase() === addr)?.[0];
+        if (symbol) prices[symbol] = price;
+      }
+    }
+    cachedPrices = prices;
+    pricesCachedAt = now;
+    console.log(`[price] fetched prices for: ${Object.keys(prices).join(", ")}`);
+    return prices;
+  } catch (err) {
+    console.warn("[price] fetchAllTokenPrices failed:", err);
+    return cachedPrices;
+  }
+}
+
+async function getTokenPrice(token: string): Promise<number | null> {
+  const prices = await fetchAllTokenPrices();
+  return prices[token.toUpperCase()] ?? null;
 }
 
 interface CycleContext {
@@ -307,16 +328,34 @@ export async function checkBalance(ctx: CycleContext) {
   const breakdown: Record<string, number> = {};
   const amounts: Record<string, number> = {};
   let totalUsd = 0;
+  const NAME_TO_SYMBOL: Record<string, string> = {
+    "usd coin": "USDC", "usdc": "USDC",
+    "ethereum": "ETH", "eth": "ETH",
+    "moltbook": "MOLT", "molt": "MOLT",
+    "nook": "NOOK",
+    "juno": "JUNO",
+    "felix": "FELIX",
+    "clawd": "CLAWD",
+    "bnkr": "BNKR", "bankr": "BNKR",
+    "venice token": "VVV", "vvv": "VVV",
+  };
+  const skip = new Set(["ETH", "SOL", "SOLANA"]);
   const lines = result.response.split('\n');
   for (const line of lines) {
-    const dollarMatch = line.match(/\(?\$?([\d,.]+)\)?$/);
-    if (!dollarMatch) continue;
-    const usdValue = parseFloat(dollarMatch[1].replace(/,/g, ''));
+    const cleaned = line.replace(/^[•*\-\s]+/, '').trim();
+    if (!cleaned) continue;
+    if (cleaned.toLowerCase().includes('total') || cleaned.toLowerCase().includes('portfolio')) continue;
+    const dollarParen = cleaned.match(/\(\$?([\d,]+(?:\.\d+)?)\)$/);
+    const dollarEnd = cleaned.match(/\$(\d+(?:\.\d+)?)$/);
+    const usdMatch = dollarParen ?? dollarEnd;
+    if (!usdMatch) continue;
+    const usdValue = parseFloat(usdMatch[1].replace(/,/g, ''));
     if (isNaN(usdValue) || usdValue <= 0.01 || usdValue >= 10000) continue;
-    const parenSymbol = line.match(/\(([A-Z][A-Z0-9]{1,9})\)/);
-    const bareSymbol = line.match(/\b([A-Z][A-Z0-9]{1,9})\s*-\s*[\d]/);
-    const symbol = parenSymbol ? parenSymbol[1] : bareSymbol ? bareSymbol[1] : null;
-    const skip = new Set(["SOL","EVM","MAINNET","POLYGON","UNICHAIN","COMBINED","TOTAL","SOLANA"]);
+    const firstPart = cleaned.split('-')[0].trim().toLowerCase();
+    const tickerInLine = cleaned.match(/\b([A-Z][A-Z0-9]{1,9})\b/);
+    const nameSymbol = NAME_TO_SYMBOL[firstPart];
+    const tickerSymbol = tickerInLine ? NAME_TO_SYMBOL[tickerInLine[1].toLowerCase()] ?? (tickerInLine[1].length <= 6 ? tickerInLine[1] : null) : null;
+    const symbol = nameSymbol ?? tickerSymbol ?? null;
     if (symbol && !skip.has(symbol)) {
       breakdown[symbol] = usdValue;
       totalUsd += usdValue;

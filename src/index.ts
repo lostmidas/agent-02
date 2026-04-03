@@ -104,7 +104,7 @@ async function cycle() {
       AGENT_ID && BATTLE_ID ? await getLatestTokensToWatch(AGENT_ID, BATTLE_ID) : [];
     const analysis = await scanTrends(ctx, tokensToWatch);
     const { totalUsd, breakdown, amounts } = await checkBalance(ctx);
-    const trades = decideAndTrade(ctx, analysis, totalUsd, breakdown, amounts);
+    const trades = await decideAndTrade(ctx, analysis, totalUsd, breakdown, amounts);
     const sells = trades.filter((t) => t.tokenIn !== "USDC");
     const buy = trades.find((t) => t.tokenIn === "USDC");
 
@@ -127,7 +127,7 @@ async function cycle() {
         const buyAmount = Math.max(0.50, (newTotalUsd * MAX_TRADE_PCT) / 100).toFixed(2);
         const usdcBalance = newBreakdown["USDC"] ?? 0;
         if (usdcBalance >= parseFloat(buyAmount)) {
-          const buyTrade = { amountIn: buyAmount, tokenIn: "USDC", tokenOut: buy.tokenOut };
+          const buyTrade = { amountIn: buyAmount, tokenIn: "USDC", tokenOut: buy.tokenOut, entryPriceUsd: buy.entryPriceUsd };
           await executeTrade(ctx, buyTrade);
           completedTradeCount++;
           if (completedTradeCount % 3 === 0) void fireReaction(ctx, buyTrade);
